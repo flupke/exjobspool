@@ -1,4 +1,4 @@
-defmodule StashexJobsPoolTest do
+defmodule JobsPoolTest do
   use ExUnit.Case, async: true
 
   test "simple sync job" do
