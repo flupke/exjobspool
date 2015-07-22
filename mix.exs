@@ -4,7 +4,7 @@ defmodule Jobspool.Mixfile do
   def project do
     [
       app: :jobspool,
-      version: "0.0.1",
+      version: "0.0.2",
       description: "Simple Elixir jobs pool",
       elixir: "~> 1.0",
       build_embedded: Mix.env == :prod,
