@@ -2,31 +2,29 @@ defmodule JobsPool do
   @moduledoc """
   A simple concurrent jobs pool.
 
-  There are two use cases for this module:
+  You can spawn jobs synchronously:
 
-  * Multiple processes spawning jobs in the same pool:
-
-        {:ok, pool} = JobsPool.start_link(10)
-        Enum.each 1..99, fn(_) ->
-          spawn fn ->
-            JobsPool.run!(pool, fn -> :timer.sleep(100) end)
-          end
+      {:ok, pool} = JobsPool.start_link(10)
+      Enum.each 1..99, fn(_) ->
+        spawn fn ->
+          JobsPool.run!(pool, fn -> :timer.sleep(100) end)
         end
-        JobsPool.run!(pool, fn -> :timer.sleep(100) end)
-        JobsPool.join(pool)     # Should take ~1s
+      end
+      JobsPool.run!(pool, fn -> :timer.sleep(100) end)
+      JobsPool.join(pool)     # Should take ~1s
 
-    `JobsPool.run!/4` blocks until the job is done and returns the job's
-    result, or reraise if it had an error.
+  `JobsPool.run!/4` blocks until the job is done and returns the job's
+  result, or reraise if it had an error.
 
-  * One process spawning jobs asynchronously:
+  You can also spawn jobs asynchronously:
 
-        {:ok, pool} = JobsPool.start_link(10)
-        Enum.each 1..100, fn(_) ->
-          JobsPool.async(pool, fn -> :timer.sleep(100) end)
-        end
-        JobsPool.join(pool)     # Should take ~1s
+      {:ok, pool} = JobsPool.start_link(10)
+      Enum.each 1..100, fn(_) ->
+        JobsPool.async(pool, fn -> :timer.sleep(100) end)
+      end
+      JobsPool.join(pool)     # Should take ~1s
 
-    There is currently no way to retrieve an async job's result.
+  There is currently no way to retrieve an async job's result.
 
   `JobsPool.start_link/2` second argument is an array of options passed to
   `GenServer.start_link/3`. For example to create a named pool:
@@ -39,6 +37,8 @@ defmodule JobsPool do
   use GenServer
 
   defmodule State do
+    @moduledoc false
+
     defstruct [
       max_concurrent_jobs: 1,
 
@@ -54,7 +54,9 @@ defmodule JobsPool do
   # Public API
 
   @doc """
+  Start a `JobsPool` server with `max_concurrent_jobs` execution slots.
 
+  `genserver_options` is passed to `GenServer.start_link/3`.
   """
   def start_link(max_concurrent_jobs, genserver_options \\ []) do
     state = %State{max_concurrent_jobs: max_concurrent_jobs}
@@ -63,6 +65,10 @@ defmodule JobsPool do
 
   @doc """
   Execute `fun` and block until it's complete, or `timeout` exceeded.
+
+  `key` can be used to avoid running the same job multiple times, only one job
+  with the same key can be executed or queued at any given time. If no key is
+  given, a random one is generated.
 
   Return `fun` return value, or raise in the current process if it encountered
   an error.
@@ -74,6 +80,10 @@ defmodule JobsPool do
 
   @doc """
   Execute `fun` asynchronously.
+
+  `key` can be used to avoid running the same job multiple times, only one job
+  with the same key can be executed or queued at any given time. If no key is
+  given, a random one is generated.
 
   Return the task key.
   """

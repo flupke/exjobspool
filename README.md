@@ -1,4 +1,4 @@
 Jobspool
 ========
 
-** TODO: Add description **
+Documentation is available at hexdocs.pm: http://hexdocs.pm/jobspool/

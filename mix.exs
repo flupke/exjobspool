@@ -33,6 +33,9 @@ defmodule Jobspool.Mixfile do
   defp deps do
     [
       {:uuid, "~> 1.0"},
+
+      {:earmark, "~> 0.1", only: :dev},
+      {:ex_doc, "~> 0.7", only: :dev},
     ]
   end
 
