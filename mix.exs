@@ -2,12 +2,15 @@ defmodule Jobspool.Mixfile do
   use Mix.Project
 
   def project do
-    [app: :jobspool,
-     version: "0.0.1",
-     elixir: "~> 1.0",
-     build_embedded: Mix.env == :prod,
-     start_permanent: Mix.env == :prod,
-     deps: deps]
+    [
+      app: :jobspool,
+      version: "0.0.1",
+      description: "Simple Elixir jobs pool",
+      elixir: "~> 1.0",
+      build_embedded: Mix.env == :prod,
+      start_permanent: Mix.env == :prod,
+      deps: deps
+    ]
   end
 
   # Configuration for the OTP application
@@ -29,6 +32,14 @@ defmodule Jobspool.Mixfile do
   defp deps do
     [
       {:uuid, "~> 1.0"},
+    ]
+  end
+
+  defp package do
+    [
+      contributors: ["Luper Rouch"],
+      licenses: ["MIT"],
+      links: %{"GitHub": "https://github.com/flupke/exjobspool"}
     ]
   end
 end
