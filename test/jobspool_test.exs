@@ -12,7 +12,7 @@ defmodule JobsPoolTest do
     {:ok, jobs} = JobsPool.start_link(10)
     increment = fn -> Agent.update(agent, &(&1 + 1)) end
     Enum.each 1..99, fn(_) ->
-      spawn fn ->
+      spawn_link fn ->
         JobsPool.run!(jobs, increment)
       end
     end
@@ -46,5 +46,18 @@ defmodule JobsPoolTest do
     end
     ret = JobsPool.run!(jobs, fn -> 1 end, 1000)
     assert ret == 1
+  end
+
+  test "jobs with explicit keys don't mix up" do
+    {:ok, jobs} = JobsPool.start_link(3)
+    Enum.each 1..10, fn(_) ->
+      spawn_link fn ->
+        uid = UUID.uuid4()
+        returned_uid = JobsPool.run!(jobs, fn -> uid end, uid)
+        assert returned_uid == uid
+      end
+    end
+    :timer.sleep(100)
+    JobsPool.join(jobs)
   end
 end

@@ -204,11 +204,8 @@ defmodule JobsPool do
     put_in(state.joiners, [])
   end
 
-  defp maybe_create_key(key) do
-    unless key do
-      UUID.uuid4()
-    end
-  end
+  defp maybe_create_key(nil), do: UUID.uuid4()
+  defp maybe_create_key(key), do: key
 
   defp run_job(state, fun, key) do
     # Check a job with `key` is not already active or queued
