@@ -43,7 +43,7 @@ defmodule Jobspool.Mixfile do
     [
       contributors: ["Luper Rouch"],
       licenses: ["MIT"],
-      links: %{"GitHub": "https://github.com/flupke/exjobspool"}
+      links: %{"Github" => "https://github.com/flupke/exjobspool"}
     ]
   end
 end
