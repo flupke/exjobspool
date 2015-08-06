@@ -225,7 +225,7 @@ defmodule JobsPool do
               {key, {:throw, term}}
             :error, exception ->
               stacktrace = System.stacktrace()
-              {key, {:exception, exception, stacktrace}}
+              {key, {:error, exception, stacktrace}}
           end
         end
 
@@ -242,7 +242,7 @@ defmodule JobsPool do
   end
 
   defp maybe_reraise({:ok, result}), do: result
-  defp maybe_reraise({:exception, exception, stacktrace}), do: reraise(exception, stacktrace)
+  defp maybe_reraise({:error, exception, stacktrace}), do: reraise(exception, stacktrace)
   defp maybe_reraise({:exit, reason}), do: exit(reason)
   defp maybe_reraise({:throw, term}), do: throw(term)
 end
