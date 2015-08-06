@@ -70,8 +70,8 @@ defmodule JobsPool do
   with the same key can be executed or queued at any given time. If no key is
   given, a random one is generated.
 
-  Return `fun` return value, or raise in the current process if it encountered
-  an error.
+  Return `fun` return value. Throws, raises and exits are bubbled up to the
+  caller.
   """
   def run!(server, fun, key \\ nil, timeout \\ :infinity) do
     GenServer.call(server, {:run, fun, key}, timeout)
