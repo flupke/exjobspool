@@ -60,4 +60,16 @@ defmodule JobsPoolTest do
     :timer.sleep(100)
     JobsPool.join(jobs)
   end
+
+  test "tasks exits bubble up to caller" do
+    {:ok, jobs} = JobsPool.start_link(10)
+    assert catch_exit(JobsPool.run!(jobs, fn -> exit 1 end)) == 1
+  end
+
+  test "tasks exits don't break the pool" do
+    {:ok, jobs} = JobsPool.start_link(10)
+    assert catch_exit(JobsPool.run!(jobs, fn -> exit 1 end)) == 1
+    assert JobsPool.run!(jobs, fn -> 1 end) == 1
+  end
+
 end
