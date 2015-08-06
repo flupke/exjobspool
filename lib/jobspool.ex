@@ -218,13 +218,14 @@ defmodule JobsPool do
         wrapped_fun = fn ->
           try do
             {key, {:ok, fun.()}}
-          rescue
-            exception ->
-              stacktrace = System.stacktrace()
-              {key, {:exception, exception, stacktrace}}
           catch
             :exit, reason ->
               {key, {:exit, reason}}
+            :throw, term ->
+              {key, {:throw, term}}
+            :error, exception ->
+              stacktrace = System.stacktrace()
+              {key, {:exception, exception, stacktrace}}
           end
         end
 
@@ -243,4 +244,5 @@ defmodule JobsPool do
   defp maybe_reraise({:ok, result}), do: result
   defp maybe_reraise({:exception, exception, stacktrace}), do: reraise(exception, stacktrace)
   defp maybe_reraise({:exit, reason}), do: exit(reason)
+  defp maybe_reraise({:throw, term}), do: throw(term)
 end

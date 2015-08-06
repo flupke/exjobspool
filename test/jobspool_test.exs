@@ -72,4 +72,14 @@ defmodule JobsPoolTest do
     assert JobsPool.run!(jobs, fn -> 1 end) == 1
   end
 
+  test "tasks throws bubble up to caller" do
+    {:ok, jobs} = JobsPool.start_link(10)
+    assert catch_throw(JobsPool.run!(jobs, fn -> throw 1 end)) == 1
+  end
+
+  test "tasks throws don't break the pool" do
+    {:ok, jobs} = JobsPool.start_link(10)
+    assert catch_throw(JobsPool.run!(jobs, fn -> throw 1 end)) == 1
+    assert JobsPool.run!(jobs, fn -> 1 end) == 1
+  end
 end
