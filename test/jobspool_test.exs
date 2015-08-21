@@ -82,4 +82,36 @@ defmodule JobsPoolTest do
     assert catch_throw(JobsPool.run!(jobs, fn -> throw 1 end)) == 1
     assert JobsPool.run!(jobs, fn -> 1 end) == 1
   end
+
+  test "exit stack is preserved" do
+    {:ok, jobs} = JobsPool.start_link(10)
+    try do
+      JobsPool.run!(jobs, fn -> exit 1 end)
+    catch
+      :exit, 1 ->
+        stack = System.stacktrace()
+        frame = Enum.at(stack, 0)
+        assert {JobsPoolTest, _, 0, [file: 'test/jobspool_test.exs', line: _]} = frame
+        frame = Enum.at(stack, 1)
+        assert {JobsPool, _, 2, [file: 'lib/jobspool.ex', line: _]} = frame
+      class, term ->
+        raise "expected {:exit, 1}, got {#{inspect class}, #{inspect term}}"
+    end
+  end
+
+  test "throw stack is preserved" do
+    {:ok, jobs} = JobsPool.start_link(10)
+    try do
+      JobsPool.run!(jobs, fn -> throw 1 end)
+    catch
+      :throw, 1 ->
+        stack = System.stacktrace()
+        frame = Enum.at(stack, 0)
+        assert {JobsPoolTest, _, 0, [file: 'test/jobspool_test.exs', line: _]} = frame
+        frame = Enum.at(stack, 1)
+        assert {JobsPool, _, 2, [file: 'lib/jobspool.ex', line: _]} = frame
+      class, term ->
+        raise "expected {:throw, 1}, got {#{inspect class}, #{inspect term}}"
+    end
+  end
 end

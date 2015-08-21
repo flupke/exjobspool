@@ -219,13 +219,9 @@ defmodule JobsPool do
           try do
             {key, {:ok, fun.()}}
           catch
-            :exit, reason ->
-              {key, {:exit, reason}}
-            :throw, term ->
-              {key, {:throw, term}}
-            :error, exception ->
+            class, reason ->
               stacktrace = System.stacktrace()
-              {key, {:error, exception, stacktrace}}
+              {key, {class, reason, stacktrace}}
           end
         end
 
@@ -242,7 +238,7 @@ defmodule JobsPool do
   end
 
   defp maybe_reraise({:ok, result}), do: result
-  defp maybe_reraise({:error, exception, stacktrace}), do: reraise(exception, stacktrace)
-  defp maybe_reraise({:exit, reason}), do: exit(reason)
-  defp maybe_reraise({:throw, term}), do: throw(term)
+  defp maybe_reraise({class, reason, stacktrace}) do
+    :erlang.raise(class, reason, stacktrace)
+  end
 end
