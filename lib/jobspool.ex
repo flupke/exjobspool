@@ -66,6 +66,9 @@ defmodule JobsPool do
   @doc """
   Execute `fun` and block until it's complete, or `timeout` exceeded.
 
+  `fun` can be an anonymous function with an arity of 0, or a `{mod, fun,
+  args}` tuple.
+
   `key` can be used to avoid running the same job multiple times, only one job
   with the same key can be executed or queued at any given time. If no key is
   given, a random one is generated.
@@ -73,7 +76,12 @@ defmodule JobsPool do
   Return `fun` return value. Throws, raises and exits are bubbled up to the
   caller.
   """
-  def run!(server, fun, key \\ nil, timeout \\ :infinity) do
+  def run!(server, fun, key \\ nil, timeout \\ :infinity)
+  def run!(server, {mod, fun, args}, key, timeout) do
+    GenServer.call(server, {:run, {mod, fun, args}, key}, timeout)
+    |> maybe_reraise()
+  end
+  def run!(server, fun, key, timeout) do
     GenServer.call(server, {:run, fun, key}, timeout)
     |> maybe_reraise()
   end
@@ -81,13 +89,20 @@ defmodule JobsPool do
   @doc """
   Execute `fun` asynchronously.
 
+  `fun` can be an anonymous function with an arity of 0, or a `{mod, fun,
+  args}` tuple.
+
   `key` can be used to avoid running the same job multiple times, only one job
   with the same key can be executed or queued at any given time. If no key is
   given, a random one is generated.
 
   Return the task key.
   """
-  def async(server, fun, key \\ nil) do
+  def async(server, fun, key \\ nil)
+  def async(server, {mod, fun, args}, key) do
+    GenServer.call(server, {:async, {mod, fun, args}, key})
+  end
+  def async(server, fun, key) do
     GenServer.call(server, {:async, fun, key})
   end
 
@@ -217,7 +232,7 @@ defmodule JobsPool do
         # processes, not in this GenServer
         wrapped_fun = fn ->
           try do
-            {key, {:ok, fun.()}}
+            {key, {:ok, run_fun_or_mfa(fun)}}
           catch
             class, reason ->
               stacktrace = System.stacktrace()
@@ -236,6 +251,9 @@ defmodule JobsPool do
     end
     state
   end
+
+  defp run_fun_or_mfa({mod, fun, args}), do: apply(mod, fun, args)
+  defp run_fun_or_mfa(fun), do: fun.()
 
   defp maybe_reraise({:ok, result}), do: result
   defp maybe_reraise({class, reason, stacktrace}) do

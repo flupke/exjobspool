@@ -114,4 +114,20 @@ defmodule JobsPoolTest do
         raise "expected {:throw, 1}, got {#{inspect class}, #{inspect term}}"
     end
   end
+
+  test "mfa run! form" do
+    {:ok, jobs} = JobsPool.start_link(10)
+    assert JobsPool.run!(jobs, {JobsPoolTest, :identity, [1]}) == 1
+  end
+
+  test "mfa async form" do
+    {:ok, agent} = Agent.start_link(fn -> 0 end)
+    {:ok, jobs} = JobsPool.start_link(10)
+    JobsPool.async(jobs, {JobsPoolTest, :increment, [agent]})
+    JobsPool.join(jobs)
+    assert Agent.get(agent, fn value -> value end) == 1
+  end
+
+  def identity(arg), do: arg
+  def increment(agent), do: Agent.update(agent, &(&1 + 1))
 end
