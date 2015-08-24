@@ -93,7 +93,7 @@ defmodule JobsPoolTest do
         frame = Enum.at(stack, 0)
         assert {JobsPoolTest, _, 0, [file: 'test/jobspool_test.exs', line: _]} = frame
         frame = Enum.at(stack, 1)
-        assert {JobsPool, _, 2, [file: 'lib/jobspool.ex', line: _]} = frame
+        assert {JobsPool, _, 4, [file: 'lib/jobspool.ex', line: _]} = frame
       class, term ->
         raise "expected {:exit, 1}, got {#{inspect class}, #{inspect term}}"
     end
@@ -109,7 +109,7 @@ defmodule JobsPoolTest do
         frame = Enum.at(stack, 0)
         assert {JobsPoolTest, _, 0, [file: 'test/jobspool_test.exs', line: _]} = frame
         frame = Enum.at(stack, 1)
-        assert {JobsPool, _, 2, [file: 'lib/jobspool.ex', line: _]} = frame
+        assert {JobsPool, _, 4, [file: 'lib/jobspool.ex', line: _]} = frame
       class, term ->
         raise "expected {:throw, 1}, got {#{inspect class}, #{inspect term}}"
     end
