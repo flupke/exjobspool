@@ -64,32 +64,32 @@ defmodule JobsPool do
   end
 
   @doc """
-  Execute `fun` and block until it's complete, or `timeout` exceeded.
+  Execute `job` and block until it's complete, or `timeout` exceeded.
 
-  `fun` can be an anonymous function with an arity of 0, or a `{mod, fun,
+  `job` can be an anonymous function with an arity of 0, or a `{mod, fun,
   args}` tuple.
 
   `key` can be used to avoid running the same job multiple times, only one job
   with the same key can be executed or queued at any given time. If no key is
   given, a random one is generated.
 
-  Return `fun` return value. Throws, raises and exits are bubbled up to the
+  Return `job` return value. Throws, raises and exits are bubbled up to the
   caller.
   """
-  def run!(server, fun, key \\ nil, timeout \\ :infinity)
+  def run!(server, job, key \\ nil, timeout \\ :infinity)
   def run!(server, {mod, fun, args}, key, timeout) do
     GenServer.call(server, {:run, {mod, fun, args}, key}, timeout)
     |> maybe_reraise()
   end
-  def run!(server, fun, key, timeout) do
-    GenServer.call(server, {:run, fun, key}, timeout)
+  def run!(server, job, key, timeout) do
+    GenServer.call(server, {:run, job, key}, timeout)
     |> maybe_reraise()
   end
 
   @doc """
-  Execute `fun` asynchronously.
+  Execute `job` asynchronously.
 
-  `fun` can be an anonymous function with an arity of 0, or a `{mod, fun,
+  `job` can be an anonymous function with an arity of 0, or a `{mod, fun,
   args}` tuple.
 
   `key` can be used to avoid running the same job multiple times, only one job
@@ -98,12 +98,12 @@ defmodule JobsPool do
 
   Return the task key.
   """
-  def async(server, fun, key \\ nil)
+  def async(server, job, key \\ nil)
   def async(server, {mod, fun, args}, key) do
     GenServer.call(server, {:async, {mod, fun, args}, key})
   end
-  def async(server, fun, key) do
-    GenServer.call(server, {:async, fun, key})
+  def async(server, job, key) do
+    GenServer.call(server, {:async, job, key})
   end
 
   @doc """
@@ -117,18 +117,24 @@ defmodule JobsPool do
   # GenServer implementation
 
   @doc false
-  def handle_call({:run, fun, key}, from, state) do
+  def init(state) do
+    Process.flag(:trap_exit, true)
+    {:ok, state}
+  end
+
+  @doc false
+  def handle_call({:run, job, key}, from, state) do
     key = maybe_create_key(key)
     state = state
-            |> run_job(fun, key)
+            |> run_job(job, key)
             |> add_waiter(key, from)
     {:noreply, state}
   end
 
   @doc false
-  def handle_call({:async, fun, key}, _from, state) do
+  def handle_call({:async, job, key}, _from, state) do
     key = maybe_create_key(key)
-    state = run_job(state, fun, key)
+    state = run_job(state, job, key)
     {:reply, key, state}
   end
 
@@ -145,12 +151,23 @@ defmodule JobsPool do
   @doc false
   def handle_info(message, state) do
     active_tasks = Map.values(state.active_jobs)
+    active_keys = Map.keys(state.active_jobs)
 
     case Task.find(active_tasks, message) do
-      {{key, result}, _task} ->
+      {result, task} ->
+        index = Enum.find_index(active_tasks, &(&1 == task))
+        key = Enum.at(active_keys, index)
         state = state
                 |> remove_active_job(key)
-                |> notify_waiters(key, result)
+                |> notify_waiters(:ok, key, result)
+                |> run_next_job()
+      {:EXIT, task, reason} ->
+        IO.puts "FOOOOOOOOOOOOOOOOOOOOO"
+        index = Enum.find_index(active_tasks, &(&1 == task))
+        key = Enum.at(active_keys, index)
+        state = state
+                |> remove_active_job(key)
+                |> notify_waiters(:error, key, {:error, {reason, {__MODULE__, :run!, []}}})
                 |> run_next_job()
       nil -> :ok
     end
@@ -161,10 +178,10 @@ defmodule JobsPool do
   # --------------------------------------------------------------------------
   # Helpers
 
-  defp notify_waiters(state, key, result) do
+  defp notify_waiters(state, kind, key, result) do
     if Map.has_key?(state.waiters, key) do
       Enum.each state.waiters[key], fn(waiter) ->
-        GenServer.reply(waiter, result)
+        GenServer.reply(waiter, {kind, result})
       end
       update_in(state.waiters, &Map.delete(&1, key))
     else
@@ -193,10 +210,10 @@ defmodule JobsPool do
 
   defp run_next_job(state) do
     case :queue.out(state.queued_jobs) do
-      {{:value, {key, fun}}, new_queued_jobs} ->
+      {{:value, {key, job}}, new_queued_jobs} ->
         state
         |> unqueue_job(new_queued_jobs, key)
-        |> run_job(fun, key)
+        |> run_job(job, key)
       {:empty, _} ->
         if Map.size(state.active_jobs) == 0 do
           state
@@ -222,41 +239,27 @@ defmodule JobsPool do
   defp maybe_create_key(nil), do: UUID.uuid4()
   defp maybe_create_key(key), do: key
 
-  defp run_job(state, fun, key) do
+  defp run_job(state, job, key) do
     # Check a job with `key` is not already active or queued
     if not Map.has_key?(state.active_jobs, key) and not Set.member?(state.queued_keys, key) do
       if Map.size(state.active_jobs) < state.max_concurrent_jobs do
         # There are slots available, execute job now
-
-        # Wrap fun to catch exceptions, since we want to reraise them in the client
-        # processes, not in this GenServer
-        wrapped_fun = fn ->
-          try do
-            {key, {:ok, run_fun_or_mfa(fun)}}
-          catch
-            class, reason ->
-              stacktrace = System.stacktrace()
-              {key, {class, reason, stacktrace}}
-          end
+        case job do
+          {mod, fun, args} ->
+            task = Task.async(mod, fun, args)
+          fun ->
+            task = Task.async(fun)
         end
-
-        # Create Task and put in in active jobs
-        task = Task.async(wrapped_fun)
         state = update_in(state.active_jobs, &Map.put(&1, key, task))
       else
         # No slots available, queue job
-        state = update_in(state.queued_jobs, &:queue.in({key, fun}, &1))
+        state = update_in(state.queued_jobs, &:queue.in({key, job}, &1))
         state = update_in(state.queued_keys, &Set.put(&1, key))
       end
     end
     state
   end
 
-  defp run_fun_or_mfa({mod, fun, args}), do: apply(mod, fun, args)
-  defp run_fun_or_mfa(fun), do: fun.()
-
   defp maybe_reraise({:ok, result}), do: result
-  defp maybe_reraise({class, reason, stacktrace}) do
-    :erlang.raise(class, reason, stacktrace)
-  end
+  defp maybe_reraise({:error, term}), do: exit(term)
 end
