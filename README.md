@@ -13,9 +13,9 @@ Changelog
 0.1.1
 -----
 
-    * Pass timeout in `JobsPool.async(server, fun, key)`
-    * Fix compilation warnings on Elixir 1.3
-    * Update dependencies
+* Pass timeout in `JobsPool.async(server, fun, key)`
+* Fix compilation warnings on Elixir 1.3
+* Update dependencies
 
 0.1.0
 -----
