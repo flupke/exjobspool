@@ -82,7 +82,7 @@ defmodule JobsPool do
     |> maybe_reraise()
   end
   def run!(server, fun, key, timeout) do
-    run!(server, {:erlang, :apply, [fun, []]}, key)
+    run!(server, {:erlang, :apply, [fun, []]}, key, timeout)
   end
 
   @doc """
