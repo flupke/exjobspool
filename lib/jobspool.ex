@@ -145,16 +145,31 @@ defmodule JobsPool do
   def handle_info(message, state) do
     active_tasks = Map.values(state.active_jobs)
 
-    case Task.find(active_tasks, message) do
-      {{key, result}, _task} ->
-        state = state
-                |> remove_active_job(key)
-                |> notify_waiters(key, result)
-                |> run_next_job()
-      nil -> :ok
-    end
+    state =
+      case do_find(active_tasks, message) do
+        {{key, result}, _task} ->
+          state
+          |> remove_active_job(key)
+          |> notify_waiters(key, result)
+          |> run_next_job()
+        nil -> :ok
+      end
 
     {:noreply, state}
+  end
+
+  defp do_find(tasks, {ref, reply}) when is_reference(ref) do
+    Enum.find_value tasks, fn
+      %Task{ref: ^ref} = task ->
+        Process.demonitor(ref, [:flush])
+        {reply, task}
+      %Task{} ->
+        nil
+    end
+  end
+
+  defp do_find(_tasks, _msg) do
+    nil
   end
 
   # --------------------------------------------------------------------------
@@ -241,14 +256,15 @@ defmodule JobsPool do
 
         # Create Task and put in in active jobs
         task = Task.async(wrapped_fun)
-        state = update_in(state.active_jobs, &Map.put(&1, key, task))
+        update_in(state.active_jobs, &Map.put(&1, key, task))
       else
         # No slots available, queue job
         state = update_in(state.queued_jobs, &:queue.in({key, {mod, fun, args}}, &1))
-        state = update_in(state.queued_keys, &Set.put(&1, key))
+        update_in(state.queued_keys, &Set.put(&1, key))
       end
+    else
+      state
     end
-    state
   end
 
   defp maybe_reraise({:ok, result}), do: result
